@@ -1,6 +1,7 @@
 package com.jady.admaster.module.splash;
 
 import android.content.Context;
+import android.text.TextUtils;
 
 import com.bumptech.glide.request.target.Target;
 import com.google.gson.Gson;
@@ -9,7 +10,6 @@ import com.jady.admaster.data.LaunchADConfig;
 import com.jady.admaster.data.SPConfig;
 import com.jady.admaster.support.thread.ThreadCallback;
 import com.jady.admaster.support.thread.ThreadUtils;
-import com.jady.admaster.support.utils.CommonUtils;
 import com.jady.admaster.support.utils.SPUtils;
 
 import java.io.BufferedInputStream;
@@ -31,7 +31,7 @@ public class SplashPresenter {
     public String SPLASH_AD_DATA = "{\"enabled\":true," +
             "\"img_url\":\"http://img.zcool.cn/community/018992561efb2732f87557013a3583.jpg@2o.jpg\"," +
             "\"enable_skip\":true," +
-            "\"jump_target\":\"http://m.baidu.com\"," +
+            "\"jump_target\":\"http://www.baidu.com/\"," +
             "\"is_webview\":true," +
             "\"always_show\":true," +
             "\"show_count\":8," +
@@ -47,14 +47,49 @@ public class SplashPresenter {
         this.iSplashView = iSplashView;
     }
 
-    public boolean shouldShowAD(Context context) {
-        if (CommonUtils.isFirstStart(context)) {
+    public boolean shouldShowAD(LaunchADConfig config) {
+        if (config == null || !config.isEnabled()) {
             return false;
         }
-//        if (!SPUtils.create(mContext, SPConfig.SPFileName.LOCAL_DATA).getBoolean(SPConfig.SPFileKey.IS_PAST_WELCOME_PAGE)) {
-//            return false;
-//        }
+        if (!config.isAlwaysShow()) {
+            if ((System.currentTimeMillis() < config.getStartDate() || System.currentTimeMillis() > config.getEndDate())) {
+                return false;
+            }
+            SPUtils cacheUtility = SPUtils.create(mContext, SPConfig.SPFileName.LOCAL_DATA);
+            int showCount = cacheUtility.getInt(SPConfig.SPFileKey.AD_SHOW_COUNT);
+            if (showCount > config.getDisabledAfterShowCount()) {
+                return false;
+            }
+            int clickCount = cacheUtility.getInt(SPConfig.SPFileKey.AD_CLICK_COUNT);
+            if (clickCount > config.getDisabledAfterClickCount()) {
+                return false;
+            }
+            int skipCount = cacheUtility.getInt(SPConfig.SPFileKey.AD_SKIP_COUNT);
+            if (skipCount > config.getDisabledAfterSkipCount()) {
+                return false;
+            }
+        }
 
+        if (!TextUtils.isEmpty(config.getChannel())) {
+            return true;
+        }
+
+        switch (config.getUserLoginType()) {
+            case LaunchADConfig.UserLoginType.ALL_USER:
+                return true;
+            case LaunchADConfig.UserLoginType.LOGGED_IN_USER:
+                return false;
+            case LaunchADConfig.UserLoginType.NOT_LOGGED_IN_USER:
+                return true;
+        }
+        switch (config.getUserInvitedType()) {
+            case LaunchADConfig.UserInviteType.ALL_USER:
+                return true;
+            case LaunchADConfig.UserInviteType.INVITED_USER:
+                return true;
+            case LaunchADConfig.UserInviteType.NOT_INVITED_USER:
+                return false;
+        }
         return true;
     }
 
@@ -111,7 +146,7 @@ public class SplashPresenter {
             @Override
             public void runOperate() throws InterruptedException {
                 //执行耗时任务，第三方库的初始化等等
-                Thread.sleep(5000);
+                Thread.sleep(2000);
             }
 
             @Override
@@ -150,12 +185,12 @@ public class SplashPresenter {
         }
     }
 
-    public void downloadImg(final Context context, final LaunchADConfig config) {
+    public void downloadImg(final LaunchADConfig config) {
         ThreadUtils.startChildThread(new ThreadCallback() {
             @Override
             public void runOperate() throws InterruptedException, ExecutionException, IOException {
-                File file = GlideApp.with(context).download(config.getImgUrl()).submit(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL).get();
-                String imgPath = context.getCacheDir() + File.separator + config.getImgUrl().substring(config.getImgUrl().lastIndexOf("/") + 1);
+                File file = GlideApp.with(mContext).download(config.getImgUrl()).submit(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL).get();
+                String imgPath = mContext.getCacheDir() + File.separator + config.getImgUrl().substring(config.getImgUrl().lastIndexOf("/") + 1);
                 copyFile(file.getAbsolutePath(), imgPath);
             }
 

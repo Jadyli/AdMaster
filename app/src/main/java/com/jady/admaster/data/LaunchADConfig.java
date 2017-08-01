@@ -58,6 +58,9 @@ public class LaunchADConfig {
     @SerializedName("is_webview")
     private boolean isWebView;
 
+    @SerializedName("channel")
+    private String channel;
+
     /**
      * 广告时长
      */
@@ -84,7 +87,7 @@ public class LaunchADConfig {
     private int disabledAfterSkipCount;
 
     /**
-     * 是否针对第一次打开的用户
+     * 是否是第一次打开
      */
     @SerializedName("is_first_open")
     private boolean isFirstOpen;
@@ -119,6 +122,26 @@ public class LaunchADConfig {
     @SerializedName("user_login_type")
     @UserLoginType
     private int userLoginType;
+
+
+
+    @UserInviteType
+    public int getUserInvitedType() {
+        return userInvitedType;
+    }
+
+    public void setUserInvitedType(@UserInviteType int userInvitedType) {
+        this.userInvitedType = userInvitedType;
+    }
+
+    @UserLoginType
+    public int getUserLoginType() {
+        return userLoginType;
+    }
+
+    public void setUserLoginType(@UserLoginType int userLoginType) {
+        this.userLoginType = userLoginType;
+    }
 
     public boolean isEnabled() {
         return enabled;
@@ -158,6 +181,14 @@ public class LaunchADConfig {
 
     public void setWebView(boolean webView) {
         isWebView = webView;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
     }
 
     public long getDuration() {
@@ -208,24 +239,6 @@ public class LaunchADConfig {
         isFirstOpen = firstOpen;
     }
 
-    @UserInviteType
-    public int getUserInvitedType() {
-        return userInvitedType;
-    }
-
-    public void setUserInvitedType(@UserInviteType int userInvitedType) {
-        this.userInvitedType = userInvitedType;
-    }
-
-    @UserLoginType
-    public int getUserLoginType() {
-        return userLoginType;
-    }
-
-    public void setUserLoginType(@UserLoginType int userLoginType) {
-        this.userLoginType = userLoginType;
-    }
-
     public long getStartDate() {
         return startDate;
     }
@@ -242,24 +255,4 @@ public class LaunchADConfig {
         this.endDate = endDate;
     }
 
-    @Override
-    public String toString() {
-        return "LaunchADConfig{" +
-                "enabled=" + enabled +
-                ", imgUrl='" + imgUrl + '\'' +
-                ", enableSkip=" + enableSkip +
-                ", jumpTarget='" + jumpTarget + '\'' +
-                ", isWebView=" + isWebView +
-                ", duration=" + duration +
-                ", alwaysShow=" + alwaysShow +
-                ", disabledAfterShowCount=" + disabledAfterShowCount +
-                ", disabledAfterClickCount=" + disabledAfterClickCount +
-                ", disabledAfterSkipCount=" + disabledAfterSkipCount +
-                ", isFirstOpen=" + isFirstOpen +
-                ", startDate=" + startDate +
-                ", endDate=" + endDate +
-                ", userInvitedType=" + userInvitedType +
-                ", userLoginType=" + userLoginType +
-                '}';
-    }
 }

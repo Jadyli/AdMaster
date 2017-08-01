@@ -18,7 +18,7 @@ public class SPConfig {
         //ad_data
         public static final String AD_IMG_PATH = "ad_img_path";
         public static final String AD_SHOW_COUNT = "ad_show_count";
-        public static final String AD_SKIP_CLICK_COUNT = "ad_skip_click_count";
+        public static final String AD_SKIP_COUNT = "ad_skip_click_count";
         public static final String AD_CLICK_COUNT = "ad_click_count";
     }
 }

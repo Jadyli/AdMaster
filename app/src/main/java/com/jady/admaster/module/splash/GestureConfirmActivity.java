@@ -16,6 +16,7 @@ import com.jady.admaster.module.main.MainActivity;
 public class GestureConfirmActivity extends AppCompatActivity implements View.OnClickListener {
     protected Button btnGestureConfirm;
     protected Button btnGestureFailure;
+    private boolean should_return;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -34,7 +35,7 @@ public class GestureConfirmActivity extends AppCompatActivity implements View.On
     @Override
     public void onClick(View view) {
         if (view.getId() == R.id.btn_gesture_confirm) {
-            boolean should_return = getIntent().getBooleanExtra("should_return", false);
+            should_return = getIntent().getBooleanExtra("should_return", false);
             if (should_return) {
                 setResult(RESULT_OK);
                 finish();

@@ -16,6 +16,7 @@ import com.jady.admaster.data.LaunchADConfig;
 import com.jady.admaster.module.common.NativePageUtils;
 import com.jady.admaster.module.common.WebviewActivity;
 import com.jady.admaster.module.main.MainActivity;
+import com.jady.admaster.support.utils.CommonUtils;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,8 @@ import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+
 public class SplashActivity extends AppCompatActivity implements ISplashView {
 
     public static final String TAG = SplashActivity.class.getSimpleName();
@@ -35,7 +38,7 @@ public class SplashActivity extends AppCompatActivity implements ISplashView {
     private LinearLayout llSplashRoot;
     private SplashPresenter splashPresenter;
     private boolean isDataInited = false, isADEnd = false, isStartedNewAty = false, isGestureEnd = false, isImgCached = false;
-    private Class nativeClass;
+    private Intent adIntent;
     private LaunchADConfig mAdConfig;
 
     @Override
@@ -43,84 +46,102 @@ public class SplashActivity extends AppCompatActivity implements ISplashView {
         super.onCreate(savedInstanceState);
 
         splashPresenter = new SplashPresenter(this, this);
-
-        if (splashPresenter.shouldShowAD(this)) {
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    setContentView(R.layout.splash_aty);
-                    initView();
-                    initAd();
-                }
-            }, 2000);
-        } else {
-            isADEnd = true;
-        }
-
         splashPresenter.setStartCount();
+
         splashPresenter.initData();
+        initAd();
+
     }
 
     private void initAd() {
-        splashPresenter.getOnlineADConfig(new LaunchADConfigCallback() {
-            @Override
-            public void onSuccess(final LaunchADConfig config) {
-                if (config == null
-                        || !config.isEnabled()
-                        || System.currentTimeMillis() < config.getStartDate()
-                        || System.currentTimeMillis() > config.getEndDate()) {
-                    onADCompleted(null);
-                    return;
-                }
+        if (!CommonUtils.isFirstStart(this)) {
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    splashPresenter.getOnlineADConfig(new LaunchADConfigCallback() {
+                        @Override
+                        public void onSuccess(final LaunchADConfig config) {
+                            if (!splashPresenter.shouldShowAD(config)) {
+                                onADCompleted(null);
+                                return;
+                            }
 
-                try {
-                    String imgPath = getCacheDir() + File.separator + config.getImgUrl().substring(config.getImgUrl().lastIndexOf("/") + 1);
-                    if (!new File(imgPath).exists()) {
-                        splashPresenter.downloadImg(SplashActivity.this, config);
-                        onADCompleted(null);
-                        return;
-                    }
-                    isImgCached = true;
-                    GlideApp.with(SplashActivity.this).load(imgPath).centerCrop().into(ivSplashAd);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    onADCompleted(null);
-                    return;
-                }
-                if (!isGestureEnd && splashPresenter.isGestureSetted()) {
-                    llSplashRoot.setVisibility(View.GONE);
-                } else {
-                    llSplashRoot.setVisibility(View.VISIBLE);
-                }
-                mAdConfig = config;
-                initTime(config);
-                ivSplashAd.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        onADCompleted(config);
-                    }
-                });
-                btnSplashSkip.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        onADCompleted(null);
-                    }
-                });
-            }
+                            setContentView(R.layout.splash_aty);
+                            llSplashRoot = (LinearLayout) findViewById(R.id.ll_splash_root);
+                            ivSplashAd = (ImageView) findViewById(R.id.iv_splash_ad);
+                            btnSplashSkip = (Button) findViewById(R.id.btn_splash_skip);
 
-            @Override
-            public void onFailure() {
+                            //第一次进入缓存图片，不显示广告
+                            try {
+                                String imgPath = getCacheDir() + File.separator + config.getImgUrl().substring(config.getImgUrl().lastIndexOf("/") + 1);
+                                if (!new File(imgPath).exists()) {
+                                    splashPresenter.downloadImg(config);
+                                    onADCompleted(null);
+                                    return;
+                                }
+                                isImgCached = true;
+                                Log.d(TAG, "imagePath:" + imgPath);
+                                GlideApp.with(SplashActivity.this).load(imgPath).centerCrop().into(ivSplashAd);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                onADCompleted(null);
+                                return;
+                            }
 
-            }
-        });
+                            //是否允许跳过
+                            if (!config.isEnableSkip()) {
+                                btnSplashSkip.setVisibility(View.GONE);
+                            }
+                            //是否设置了手势密码
+                            if (splashPresenter.isGestureSetted() && !isGestureEnd) {
+                                llSplashRoot.setVisibility(View.GONE);
+                            } else {
+                                llSplashRoot.setVisibility(View.VISIBLE);
+                            }
+                            mAdConfig = config;
+                            //初始化倒计时
+
+                            Log.d(TAG, "initTime");
+                            initTime(config);
+                            ivSplashAd.setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v) {
+                                    onADCompleted(config);
+                                }
+                            });
+
+
+                            btnSplashSkip.setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v) {
+                                    onADCompleted(null);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure() {
+                            onADCompleted(null);
+                        }
+                    });
+                }
+            }, 1000);
+        } else {
+            onADCompleted(null);
+        }
     }
 
+    /**
+     * 初始化倒计时
+     *
+     * @param config
+     */
     private void initTime(LaunchADConfig config) {
         if (config == null) {
             return;
         }
         final long count = config.getDuration() / 1000;
-        //使用Schedulers.trampoline()是为了解决有时候interval不起作用，不按时发射
+//        使用Schedulers.trampoline()是为了解决有时候interval不起作用，不按时发射
         Observable.interval(0, 1, TimeUnit.SECONDS, Schedulers.trampoline())//设置0延迟，每隔一秒发送一条数据
                 .take((int) (count)) //设置总共发送的次数
                 .map(new Func1<Long, Long>() {//long 值是从小到大，倒计时需要将值倒置
@@ -134,7 +155,7 @@ public class SplashActivity extends AppCompatActivity implements ISplashView {
                 .subscribe(new Subscriber<Long>() {
                     @Override
                     public void onCompleted() {
-                        btnSplashSkip.setText("跳过");
+//                        btnSplashSkip.setText("跳过");
                         Log.d(TAG, "initTime onCompleted");
                         onADCompleted(null);
                     }
@@ -151,51 +172,84 @@ public class SplashActivity extends AppCompatActivity implements ISplashView {
                         btnSplashSkip.setText(value + "S 跳过");
                     }
                 });
+
+//        new CountDownTimer(config.getDuration(), 1000) {
+//            @Override
+//            public void onTick(long millisUntilFinished) {
+//                Log.d(TAG, "initTime onNext:" + millisUntilFinished / 1000);
+//                btnSplashSkip.setText(millisUntilFinished / 1000 + "S 跳过");
+//            }
+//
+//            @Override
+//            public void onFinish() {
+//                onADCompleted(null);
+//            }
+//        }.start();
     }
 
+    /**
+     * 广告加载完成
+     *
+     * @param config
+     */
     private void onADCompleted(LaunchADConfig config) {
 
-        isADEnd = true;
-        if (!isGestureEnd && splashPresenter.isGestureSetted()) {
+        Log.d(TAG, "onADCompleted isAdEnd:" + isADEnd + ",isDataInited:" + isDataInited);
+
+        if (splashPresenter.isGestureSetted() && !isGestureEnd) {
             return;
         }
 
+        if (isADEnd) {
+            return;
+        }
+        isADEnd = true;
+
         if (config == null) {
-            if (isDataInited) {
+            if (isDataInited && !isStartedNewAty) {
                 startOtherActivity(new Intent(this, MainActivity.class));
             } else {
-                llSplashRoot.setVisibility(View.GONE);
+                if (llSplashRoot != null) {
+                    llSplashRoot.setVisibility(View.GONE);
+                }
             }
         } else {
-            if (config.isWebView()) {
-                Intent intent = new Intent(this, WebviewActivity.class);
-                intent.putExtra("url", config.getJumpTarget());
-                startOtherActivity(intent);
-            } else {
-                nativeClass = NativePageUtils.getNativeClass(config.getJumpTarget());
-                if (nativeClass == null) {
-                    return;
-                }
 
-                if (isDataInited) {
-                    //数据加载完成
-                    Intent intent = new Intent(this, nativeClass);
-                    startOtherActivity(intent);
-                } else {
-                    //数据加载未完成
-                    Log.d(TAG, "点击广告时数据未加载完成");
+            if (config.isWebView()) {
+                adIntent = new Intent(this, WebviewActivity.class);
+                adIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+                adIntent.putExtra("url", config.getJumpTarget());
+            } else {
+                adIntent = NativePageUtils.getNativeIntent(this, config.getJumpTarget());
+            }
+            if (!isDataInited || isStartedNewAty) {
+                //数据没有加载完成
+                return;
+            }
+            if (adIntent != null) {
+                if (!MainActivity.class.getName().equals(adIntent.getComponent().getClassName())) {
+                    startActivity(new Intent(this, MainActivity.class));
                 }
+                startOtherActivity(adIntent);
+            } else {
+                startOtherActivity(new Intent(this, MainActivity.class));
             }
         }
     }
 
-    @Override
+    /**
+     * 数据加载完成
+     */
     public void onDataInited() {
+
+        Log.d(TAG, "onDataInited isImgCached:" + isImgCached + ", isADEnd:" + isADEnd + ",isStartedNewActivity:" + isStartedNewAty);
         isDataInited = true;
+        //欢迎页
         if (!splashPresenter.isPastWelcomePage()) {
             startOtherActivity(new Intent(this, WelcomeActivity.class));
             return;
         }
+        //手势
         if (splashPresenter.isGestureSetted()) {
             if (isImgCached) {
                 Intent intent = new Intent(this, GestureConfirmActivity.class);
@@ -206,16 +260,27 @@ public class SplashActivity extends AppCompatActivity implements ISplashView {
             }
             return;
         }
-        if (isADEnd && !isStartedNewAty) {
-            //广告结束且没有开启新的Activity
-            if (nativeClass != null) {
-                startOtherActivity(new Intent(this, nativeClass));
-            } else {
-                startOtherActivity(new Intent(this, MainActivity.class));
+        if (!isADEnd || isStartedNewAty) {
+            return;
+        }
+        //广告结束且没有开启新的Activity
+        if (adIntent != null) {
+            if (!MainActivity.class.getSimpleName().equals(adIntent.getComponent().getClassName())) {
+                startActivity(new Intent(this, MainActivity.class));
             }
+            startOtherActivity(adIntent);
+        } else {
+            startOtherActivity(new Intent(this, MainActivity.class));
         }
     }
 
+    /**
+     * 手势密码回调
+     *
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -229,15 +294,10 @@ public class SplashActivity extends AppCompatActivity implements ISplashView {
         }
     }
 
-    private void initView() {
-        llSplashRoot = (LinearLayout) findViewById(R.id.ll_splash_root);
-        ivSplashAd = (ImageView) findViewById(R.id.iv_splash_ad);
-        btnSplashSkip = (Button) findViewById(R.id.btn_splash_skip);
-    }
-
     private void startOtherActivity(Intent intent) {
         isStartedNewAty = true;
         startActivity(intent);
         finish();
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 }
